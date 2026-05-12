@@ -5,15 +5,11 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-// Use process.env.PORT or default to 3000 if running locally without explicit port setting 
 const PORT = process.env.PORT || 3000;
 
 const io = new Server(server, {
-  allowEIO3: true, // Support for Socket.io 2.x clients (Android)
-  cors: {
-    origin: "*", // Keep this broad for initial testing, but restrict in production!
-    methods: ["GET", "POST"]
-  }
+  allowEIO3: true,
+  cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
 app.use(express.static(__dirname));
@@ -21,37 +17,45 @@ app.use(express.static(__dirname));
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  socket.on('join-room', (roomId) => {
-    socket.join(roomId);
-    console.log(`Socket ${socket.id} joined room ${roomId}`);
+  // 1. Android device announces it is ready to share
+  socket.on('notify-sharing', (data) => {
+    console.log(`Device ${socket.id} is ready to share.`);
+    // Tell all web dashboards that a new device is available
+    socket.broadcast.emit('incoming-request', { 
+        id: socket.id, 
+        name: data.name || 'Unknown Device' 
+    });
   });
 
-  // Browser asks Android to start the stream
-  socket.on('request-offer', () => {
-    console.log('Browser requested offer');
-    io.emit('request-offer');
+  // 2. Web dashboard accepts a specific device's request
+  socket.on('accept-request', (targetAndroidId) => {
+    console.log(`Web ${socket.id} accepted share from ${targetAndroidId}`);
+    // Tell that SPECIFIC Android device to start sending video to this web user
+    io.to(targetAndroidId).emit('request-offer', { viewerId: socket.id });
   });
 
+  // 3. Point-to-Point WebRTC Signaling
+  // Notice we now use io.to(target).emit instead of socket.broadcast
+  
   socket.on('sdp-offer', (data) => {
-    console.log('Relaying Offer');
-    socket.broadcast.emit('sdp-offer', data);
+    io.to(data.target).emit('sdp-offer', { senderId: socket.id, sdp: data.sdp });
   });
 
   socket.on('sdp-answer', (data) => {
-    console.log('Relaying Answer');
-    socket.broadcast.emit('sdp-answer', data);
+    io.to(data.target).emit('sdp-answer', data);
   });
 
   socket.on('ice-candidate', (data) => {
-    console.log('Relaying ICE Candidate');
-    socket.broadcast.emit('ice-candidate', data);
+    io.to(data.target).emit('ice-candidate', data);
   });
 
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
+    // Tell dashboards to remove this device if it disconnected
+    socket.broadcast.emit('device-disconnected', socket.id);
   });
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Signaling server running on http://localhost:${PORT}`);
+  console.log(`Targeted signaling server running on port ${PORT}`);
 });
