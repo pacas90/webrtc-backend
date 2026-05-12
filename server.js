@@ -18,12 +18,13 @@ io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
   // 1. Android device announces it is ready to share
-  socket.on('notify-sharing', (data) => {
-    console.log(`Device ${socket.id} is ready to share.`);
-    // Tell all web dashboards that a new device is available
+socket.on('notify-sharing', (data) => {
+    console.log(`Device ${socket.id} is ready to share. Type: ${data.type}`);
+
     socket.broadcast.emit('incoming-request', { 
         id: socket.id, 
-        name: data.name || 'Unknown Device' 
+        name: data.name || 'Unknown Device',
+        type: data.type 
     });
   });
 
