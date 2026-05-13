@@ -28,6 +28,12 @@ socket.on('notify-sharing', (data) => {
     });
   });
 
+  socket.on('end-call', (targetAndroidId) => {
+    console.log(`Web ${socket.id} ended call with ${targetAndroidId}`);
+    
+    io.to(targetAndroidId).emit('call-ended-by-operator');
+  });
+
   // 2. Web dashboard accepts a specific device's request
   socket.on('accept-request', (targetAndroidId) => {
     console.log(`Web ${socket.id} accepted share from ${targetAndroidId}`);
