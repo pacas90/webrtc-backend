@@ -28,6 +28,10 @@ socket.on('notify-sharing', (data) => {
     });
   });
 
+  socket.on('camera-state', (data) => {
+    io.to(data.target).emit('camera-state', data.isFront);
+  });
+
   socket.on('end-call', (targetAndroidId) => {
     console.log(`Web ${socket.id} ended call with ${targetAndroidId}`);
     
